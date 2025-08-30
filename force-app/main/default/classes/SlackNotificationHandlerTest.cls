@@ -1,36 +1,106 @@
 @IsTest
 private class SlackNotificationHandlerTest {
-    // シンプルなモック：Slack側は200を返すだけ
-    private class OkMock implements HttpCalloutMock {
-        public HTTPResponse respond(HTTPRequest req) {
-            System.assertEquals('POST', req.getMethod());
-            System.assert(req.getBody().contains('"blocks"')); // Block Kit が含まれること
-            HttpResponse res = new HttpResponse();
-            res.setStatusCode(200);
-            res.setBody('ok');
-            return res;
-        }
+
+    // --- CMDTレコードを用意（テスト内のDMLは可） ---
+    private static void upsertCmdt(Boolean enabled, Decimal minAmount, String stagesCsv) {
+        // 既定想定: DeveloperName='Default'
+        Slack_Config__mdt m = new Slack_Config__mdt(
+            DeveloperName = 'Default',
+            MasterLabel   = 'Default',
+            Enabled__c    = enabled,
+            MinAmount__c  = minAmount,
+            TargetStages__c = stagesCsv
+        );
+        upsert m DeveloperName; // DeveloperNameを外部キー代わりに
     }
 
-    @IsTest static void testPostBlockKit() {
-        // CMDTがあればそれを使う。なければConfのデフォルトで通る前提
-        Account a = new Account(Name='テスト株式会社'); insert a;
-        User u = [SELECT Id FROM User WHERE IsActive = true LIMIT 1];
-
-        Opportunity o = new Opportunity(
-            Name='Block Kitテスト商談',
-            StageName='Proposal/Price Quote',
-            CloseDate=Date.today().addDays(30),
-            Amount=1200000,
-            AccountId=a.Id,
-            OwnerId=u.Id,
-            Probability=50
+    // --- 最小限の商談作成 ---
+    private static Opportunity newOpp(String name, String stage, Decimal amount) {
+        return new Opportunity(
+            Name = name,
+            StageName = stage,
+            CloseDate = Date.today().addDays(7),
+            Amount = amount
         );
-        insert o;
+    }
 
-        Test.setMock(HttpCalloutMock.class, new OkMock());
+    // ========== テスト1：Insertで複数件、フィルタにより通知対象が絞られる ==========
+    @IsTest static void testBulkInsertWithFilterAndSuccessPost() {
+        upsertCmdt(true, 50000, 'Prospecting, Proposal/Price Quote');
+
+        List<Opportunity> opps = new List<Opportunity>{
+            newOpp('A-対象(Prospecting 10万)', 'Prospecting', 100000),
+            newOpp('B-金額不足(2万)', 'Prospecting', 20000), // 金額で落ちる
+            newOpp('C-ステージ対象外', 'Closed Lost', 200000), // ステージで落ちる
+            newOpp('D-対象(Proposal 7万)', 'Proposal/Price Quote', 70000)
+        };
+
         Test.startTest();
-        System.enqueueJob(new SlackNotificationHandler(new Set<Id>{ o.Id }));
-        Test.stopTest(); // Queueable実行＆HTTP送信
+        SlackHttpMock.reset(200, 'OK');
+        Test.setMock(HttpCalloutMock.class, new SlackHttpMock());
+        insert opps; // after insert でハンドラー実行→Queueable→HTTPモック
+        Test.stopTest(); // Queueable実行
+
+        System.assertEquals(true, SlackHttpMock.requestCount > 0, 'POSTが呼ばれていること');
+
+        // モックに渡されたbody内に「対象レコード名」が含まれているかざっくり検証
+        String bodyAll = String.join(SlackHttpMock.bodies, '\n');
+        System.assert(bodyAll.contains('A-対象(Prospecting 10万)'), 'Aが含まれる');
+        System.assert(!bodyAll.contains('B-金額不足(2万)'), 'Bは含まれない');
+        System.assert(!bodyAll.contains('C-ステージ対象外'), 'Cは含まれない');
+        System.assert(bodyAll.contains('D-対象(Proposal 7万)'), 'Dが含まれる');
+    }
+
+    // ========== テスト2：Updateでステージ/金額の変更のみ通知、HTTP失敗でも落ちない ==========
+    @IsTest static void testBulkUpdateChangeDetectionAndFailurePost() {
+        upsertCmdt(true, 0, 'Prospecting, Negotiation/Review');
+
+        // 事前Insert
+        List<Opportunity> opps = new List<Opportunity>{
+            newOpp('E-変更なし', 'Prospecting', 50000),
+            newOpp('F-ステージ変更あり', 'Prospecting', 60000),
+            newOpp('G-金額変更あり', 'Negotiation/Review', 70000)
+        };
+        insert opps;
+
+        // 更新：Eは全く変更なし、Fはステージ変更、Gは金額変更
+        opps[0].Description = 'テキストだけ変更（通知対象外）';
+        opps[1].StageName = 'Negotiation/Review';
+        opps[2].Amount = 90000;
+
+        Test.startTest();
+        SlackHttpMock.reset(429, 'Too Many Requests'); // 失敗コードで返す
+        Test.setMock(HttpCalloutMock.class, new SlackHttpMock());
+        update opps; // after update → Queueable → HTTPモック(失敗)
+        Test.stopTest();
+
+        // 失敗でも例外で落ちずに完走する想定
+        System.assertEquals(true, SlackHttpMock.requestCount > 0, 'POSTが呼ばれていること');
+
+        String bodyAll = String.join(SlackHttpMock.bodies, '\n');
+        System.assert(!bodyAll.contains('E-変更なし'), 'Eは含まれない（変更なし）');
+        System.assert(bodyAll.contains('F-ステージ変更あり'), 'Fは含まれる（ステージ変更）');
+        System.assert(bodyAll.contains('G-金額変更あり'), 'Gは含まれる（金額変更）');
+    }
+
+    // ========== テスト3：機能OFFなら何も送らない ==========
+    @IsTest static void testDisabledNoPost() {
+        upsertCmdt(false, 0, null);
+        Test.startTest();
+        SlackHttpMock.reset(200, 'OK');
+        Test.setMock(HttpCalloutMock.class, new SlackHttpMock());
+        insert newOpp('H-機能OFF', 'Prospecting', 100000);
+        Test.stopTest();
+        System.assertEquals(0, SlackHttpMock.requestCount, '機能OFFなのでPOSTなし');
+    }
+
+    // ========== テスト4：URL生成（@TestVisible） ==========
+    @IsTest static void testMakeRecordUrl() {
+        Opportunity o = newOpp('I-URL', 'Prospecting', 10000);
+        insert o;
+        String url = SlackNotificationHandler.makeRecordUrl('Opportunity', o.Id);
+        System.assert(url.startsWith(URL.getSalesforceBaseUrl().toExternalForm()), 'ベースURLから始まる');
+        System.assert(url.contains('/lightning/r/Opportunity/' + String.valueOf(o.Id) + '/view'),
+            'LightningのレコードURL形式であること');
     }
 }

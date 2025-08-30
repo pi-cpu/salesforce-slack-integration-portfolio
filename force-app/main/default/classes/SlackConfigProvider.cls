@@ -1,38 +1,31 @@
 public with sharing class SlackConfigProvider {
-    /** 設定用の軽量DTO（外部クラスから参照するので public） */
+    /** 設定DTO（軽量） */
     public class Conf {
-        public Boolean enabled = true;                 // 既定ON
-        public Decimal minAmount;                      // nullなら金額判定なし
-        public Set<String> targetStages = new Set<String>(); // 空ならステージ判定なし
+        public Boolean enabled = true;
+        public Decimal minAmount;                      // nullで金額判定なし
+        public Set<String> targetStages = new Set<String>(); // 空でステージ判定なし
     }
 
     /**
-     * Custom Metadata: Slack_Config__mdt（DeveloperName='Default' を想定）
-     * 無ければ安全デフォルトで返す
+     * CMDT: Slack_Config__mdt
+     * - DeveloperName='Default' を1件用意（推奨）
+     * - 将来的に複数レコード運用する場合は、ここで統合ロジックを追加（例：OR結合）
      */
     public static Conf load() {
         Conf c = new Conf();
 
         try {
+            // 代表1件だけ使うパターン（最小構成）
             Slack_Config__mdt m = Slack_Config__mdt.getInstance('Default');
-            if (m == null) return c;
+            if (m != null) {
+                if (m.Enabled__c != null) c.enabled = m.Enabled__c;
+                if (m.MinAmount__c != null) c.minAmount = m.MinAmount__c;
 
-            // Enabled
-            if (m.Enabled__c != null) c.enabled = m.Enabled__c;
-
-            // MinAmount
-            if (m.MinAmount__c != null) c.minAmount = m.MinAmount__c;
-
-            // TargetStages（カンマ区切り）
-            c.targetStages.clear();
-            if (m.TargetStages__c != null && m.TargetStages__c.trim().length() > 0) {
-                String normalized = m.TargetStages__c
-                    .replaceAll('[、，]', ',')     // 全角カンマ → 半角
-                    .replaceAll('\\s*,\\s*', ',')  // カンマ前後の空白除去
-                    .toLowerCase()
-                    .trim();
-                for (String s : normalized.split(',')) {
-                    if (!String.isBlank(s)) c.targetStages.add(s);
+                c.targetStages.clear();
+                if (!String.isBlank(m.TargetStages__c)) {
+                    for (String s : m.TargetStages__c.split('\\s*,\\s*')) {
+                        if (!String.isBlank(s)) c.targetStages.add(s.trim());
+                    }
                 }
             }
         } catch (Exception e) {
