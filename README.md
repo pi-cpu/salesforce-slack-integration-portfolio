@@ -1,18 +1,171 @@
-# Salesforce DX Project: Next Steps
 
-Now that you’ve created a Salesforce DX project, what’s next? Here are some documentation resources to get you started.
+# Salesforce + Slack Notification Integration (Portfolio)
 
-## How Do You Plan to Deploy Your Changes?
+> **完成版**：このリポジトリは転職用ポートフォリオとして整理した完成版です。学習途中の履歴は別リポジトリに残しています。
 
-Do you want to deploy a set of changes, or create a self-contained application? Choose a [development model](https://developer.salesforce.com/tools/vscode/en/user-guide/development-models).
+![Salesforce](https://img.shields.io/badge/Salesforce-Apex-blue)
+![Slack](https://img.shields.io/badge/Slack-Incoming%20Webhook-4A154B)
+![CI](https://img.shields.io/badge/Tests-passing-brightgreen)
 
-## Configure Your Salesforce DX Project
+---
 
-The `sfdx-project.json` file contains useful configuration information for your project. See [Salesforce DX Project Configuration](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_ws_config.htm) in the _Salesforce DX Developer Guide_ for details about this file.
+## 概要
 
-## Read All About It
+Salesforce の **商談（Opportunity）** 更新をトリガーに、**Slack の指定チャンネルへ通知**します。  
+標準連携では難しい「通知条件・メッセージの細かい制御」を **Apex + Webhook** で柔軟に実現します。
 
-- [Salesforce Extensions Documentation](https://developer.salesforce.com/tools/vscode/)
-- [Salesforce CLI Setup Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_intro.htm)
-- [Salesforce DX Developer Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_intro.htm)
-- [Salesforce CLI Command Reference](https://developer.salesforce.com/docs/atlas.en-us.sfdx_cli_reference.meta/sfdx_cli_reference/cli_reference.htm)
+- 非同期処理（Queueable/AllowsCallouts）で **バルク安全**・ガバナ制限に配慮
+- 閾値や対象ステージは **Custom Metadata Type (CMDT)** でノーコード管理
+- Webhook URL は **Named Credential** に外出しして **シークレットをコードに持たない**
+
+---
+
+## デモ（イメージ）
+
+> スクリーンショット差し替え想定：`docs/screenshot-slack.png` を後日追加
+
+```text
+[商談更新] ACME - 新規導入案件
+フェーズ: Negotiation/Review (確度 50%)
+金額: ¥3,000,000
+担当: Taro Sales
+備考: 9/15 見積再提示
+```
+
+---
+
+## アーキテクチャ
+
+```mermaid
+flowchart LR
+    A[Opportunity Update] --> B[Apex Trigger]
+    B --> C[SlackNotificationHandler<br/>(Queueable + AllowsCallouts)]
+    C --> D[Named Credential: Slack_Webhook]
+    D --> E[Slack Incoming Webhook]
+    E --> F[Slack Channel]
+```
+
+### 主要コンポーネント
+- **OpportunityTrigger.trigger**  
+  フェーズ／金額変化を検知して通知対象を抽出。関連情報をバルク SOQL で取得し、1トランザクションにつき1ジョブだけ enqueue。
+- **SlackNotificationHandler.cls**  
+  `Queueable, Database.AllowsCallouts` で非同期 POST。Slack Block Kit の `blocks` を組み立て、複数商談を1リクエストで送信。
+- **SlackConfigProvider.cls**  
+  CMDT `Slack_Config__mdt` を読み込み、`Enabled__c` / `MinAmount__c` / `TargetStages__c` を提供。未設定時も安全デフォルトで動作。
+
+---
+
+## セットアップ
+
+### 0) 前提
+- Salesforce 組織（Sandbox / Dev Org）
+- Slack ワークスペース（アプリ「Incoming Webhooks」を有効化）
+- Salesforce CLI（新 CLI）：`sf` コマンドが使えること
+
+### 1) Slack Webhook URL を発行
+1. Slack で **Incoming Webhooks** を有効化  
+2. 通知先チャンネルを選択して **Webhook URL** を取得
+
+### 2) Salesforce 側の準備
+1. **Named Credential** を作成  
+   - 設定 → **名前付き資格情報** → 新規  
+   - ラベル: `Slack Webhook` / 名前: `Slack_Webhook`  
+   - URL: 取得した Webhook URL  
+   - 認証: なし（匿名 POST）  
+   - 利用ユーザへ権限セット割り当てを忘れずに
+2. **Custom Metadata Type (CMDT)** を作成  
+   - 設定 → **カスタムメタデータ型** → 新規  
+   - ラベル: `Slack Config` / API 名: `Slack_Config`  
+   - 項目:
+     - `Enabled__c` (Checkbox)
+     - `MinAmount__c` (Number/Decimal)
+     - `TargetStages__c` (Text, カンマ区切り: 例 `Prospecting, Negotiation/Review, Closed Won`)
+   - レコード `Default` を作成して上記項目を設定
+
+### 3) デプロイ & テスト
+```bash
+# 接続
+sf org login web --alias MyOrg
+sf config set target-org=MyOrg
+
+# デプロイ
+sf project deploy start --source-dir force-app --ignore-conflicts
+
+# 単体テスト（必要に応じてクラス名を調整）
+sf apex run test --tests SlackNotificationHandlerTest --result-format human
+```
+
+---
+
+## 使い方
+
+- 商談の **フェーズ** または **金額** が変化したとき、トリガで抽出 → ハンドラが Slack へ送信します。
+- 送信されるメッセージは **Block Kit** 構造で、読みやすいカード風のレイアウトになります。
+
+### 送信 JSON（例）
+```json
+{
+  "blocks": [
+    { "type": "header", "text": { "type": "plain_text", "text": "商談更新" } },
+    { "type": "section", "fields": [
+      { "type": "mrkdwn", "text": "*商談名*\nACME - 新規導入案件" },
+      { "type": "mrkdwn", "text": "*フェーズ*\nNegotiation/Review (50%)" },
+      { "type": "mrkdwn", "text": "*金額*\n¥3,000,000" },
+      { "type": "mrkdwn", "text": "*担当*\nTaro Sales" }
+    ]},
+    { "type": "section", "text": { "type": "mrkdwn", "text": "*備考*\n9/15 見積再提示" } },
+    { "type": "divider" }
+  ]
+}
+```
+
+---
+
+## カスタマイズ
+
+- **通知しきい値**：`MinAmount__c` に金額下限をセット（未設定なら無効）  
+- **対象ステージ**：`TargetStages__c` にカンマ区切りで列挙（空なら無効）  
+- **ON/OFF**：`Enabled__c` で一時停止が可能  
+- **拡張**：Teams/Discord/Google Chat などの Webhook にも容易に派生可能
+
+---
+
+## セキュリティ
+
+- Webhook URL は **Named Credential** に格納（コードやリポジトリに含めない）  
+- GitHub では **Push Protection / Secret Scanning** を有効化  
+- テストやログでシークレットを出力しない（`System.debug` の取り扱いに注意）
+
+---
+
+## 運用ガイド
+
+- **ログ監視**：失敗時は `System.debug(ERROR, ...)` が出力されます（本番は監査用カスタムオブジェクト／PE へ移行可）  
+- **負荷対策**：1トランザクション=1ジョブ運用。大量更新は Platform Events などへ拡張余地あり  
+- **変更管理**：閾値・ステージ変更は CMDT で即時反映（デプロイ不要）
+
+---
+
+## トラブルシュート
+
+- **ApexClass XML エラー（`cvc-elt.1.a`）**  
+  - メタ XML が SFDX 形式になっているか確認（`<ApexClass xmlns=...>` / `<ApexTrigger xmlns=...>`）
+- **`Invalid type: SlackConfigProvider.Conf`**  
+  - 依存順に注意。`SlackConfigProvider` のデプロイが先行しているかチェック
+- **Slack が 401/403**  
+  - Webhook URL が無効／権限不足。Named Credential を再確認
+- **Git の push で non-fast-forward**  
+  - 初期 README がリモートにあるだけなら `git push --force-with-lease` で上書き
+
+---
+
+## ライセンス
+
+このポートフォリオは学習・採用選考の評価目的で公開しています。商用利用や再配布はご相談ください。
+
+---
+
+## 著者
+
+- @pi-cpu — Salesforce エンジニア（Apex／API 連携／テスト自動化）
+- 目的：**「標準を尊重しつつ、必要なところだけコードで拡張」** を実務レベルで示すこと
