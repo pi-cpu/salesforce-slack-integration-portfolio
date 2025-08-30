@@ -14,5 +14,5 @@ trigger OpportunityTrigger on Opportunity (after insert, after update) {
     if (changed.isEmpty()) return;
 
     // Queueable を1回だけ起動（バルク安全）
-    System.enqueueJob(new SlackNotificationHandler.QueueJob(new List<Id>(changed)));
+    System.enqueueJob(new SlackNotificationHandler(changed));
 }

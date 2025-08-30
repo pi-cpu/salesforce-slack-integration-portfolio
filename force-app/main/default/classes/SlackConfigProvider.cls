@@ -26,8 +26,13 @@ public with sharing class SlackConfigProvider {
             // TargetStages（カンマ区切り）
             c.targetStages.clear();
             if (m.TargetStages__c != null && m.TargetStages__c.trim().length() > 0) {
-                for (String s : m.TargetStages__c.split('\\s*,\\s*')) {
-                    if (!String.isBlank(s)) c.targetStages.add(s.trim());
+                String normalized = m.TargetStages__c
+                    .replaceAll('[、，]', ',')     // 全角カンマ → 半角
+                    .replaceAll('\\s*,\\s*', ',')  // カンマ前後の空白除去
+                    .toLowerCase()
+                    .trim();
+                for (String s : normalized.split(',')) {
+                    if (!String.isBlank(s)) c.targetStages.add(s);
                 }
             }
         } catch (Exception e) {

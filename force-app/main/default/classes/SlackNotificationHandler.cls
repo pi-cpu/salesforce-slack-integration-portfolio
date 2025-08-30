@@ -1,12 +1,10 @@
-public with sharing class SlackNotificationHandler {
+public with sharing class SlackNotificationHandler implements System.Queueable, Database.AllowsCallouts {
+    
+    private Set<Id> oppIds;
+    public SlackNotificationHandler(Set<Id> oppIds) { this.oppIds = oppIds; }
 
-    // Queueableに渡す軽量DTO
-    public class QueueJob implements Queueable {
-        private List<Id> oppIds;
-        public QueueJob(List<Id> oppIds) { this.oppIds = oppIds; }
-        public void execute(QueueableContext qc) {
-            SlackNotificationHandler.postOpportunities(oppIds);
-        }
+    public void execute(QueueableContext qc) {
+        postOpportunities(oppIds);
     }
 
     // 文字列がnull/空白なら代替値を返す
@@ -15,7 +13,7 @@ public with sharing class SlackNotificationHandler {
     }
 
     // 公開API：商談IDの束をBlock Kitでまとめて送る
-    public static void postOpportunities(List<Id> oppIds) {
+    public static void postOpportunities(Set<Id> oppIds) {
         if (oppIds == null || oppIds.isEmpty()) return;
 
         // 設定（CMDT）を読み込み

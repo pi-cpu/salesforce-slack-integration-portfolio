@@ -30,7 +30,7 @@ private class SlackNotificationHandlerTest {
 
         Test.setMock(HttpCalloutMock.class, new OkMock());
         Test.startTest();
-        System.enqueueJob(new SlackNotificationHandler.QueueJob(new List<Id>{ o.Id }));
+        System.enqueueJob(new SlackNotificationHandler(new Set<Id>{ o.Id }));
         Test.stopTest(); // Queueable実行＆HTTP送信
     }
 }
