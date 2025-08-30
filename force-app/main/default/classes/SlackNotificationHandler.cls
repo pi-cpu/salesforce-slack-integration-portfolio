@@ -32,8 +32,14 @@ public with sharing class SlackNotificationHandler implements System.Queueable, 
         // 閾値・対象ステージでフィルタ
         List<Opportunity> filtered = new List<Opportunity>();
         for (Opportunity o : opps) {
-            Boolean stageOk = (conf.targetStages.isEmpty() || conf.targetStages.contains(o.StageName));
-            Boolean amountOk = (conf.minAmount == null || (o.Amount != null && o.Amount >= conf.minAmount));
+            Boolean stageOk = (
+            conf.targetStages.isEmpty() ||
+            conf.targetStages.contains( (o.StageName == null ? '' : o.StageName.toLowerCase()) )
+            );
+        Boolean amountOk = (
+            conf.minAmount == null ||
+            (o.Amount != null && o.Amount >= conf.minAmount)
+            );
             if (stageOk && amountOk) filtered.add(o);
         }
         if (filtered.isEmpty()) return;
