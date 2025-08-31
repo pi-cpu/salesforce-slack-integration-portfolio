@@ -36,7 +36,7 @@ Salesforce の **商談（Opportunity）** 更新をトリガーに、**Slack �
 
 ## アーキテクチャ
 
-**```mermaid**
+```mermaid
 flowchart TD
   T["OpportunityTrigger (after insert/update)"]
   H["SlackNotificationHandler"]
@@ -46,7 +46,7 @@ flowchart TD
   T --> H
   H -->|bulk filter & chunk| Q
   Q -->|POST JSON (blocks)| W
-**```**
+```
 
 ### 主要コンポーネント
 
