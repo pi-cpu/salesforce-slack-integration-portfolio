@@ -44,10 +44,9 @@ flowchart TD
   W[["Slack Incoming Webhook"]]
 
   T --> H
-  H -->|bulk filter & chunk| Q
-  Q -->|POST JSON (blocks)| W
-
-
+  H -->|"bulk filter & chunk"| Q
+  Q -->|"POST JSON blocks"| W
+```
 
 ### 主要コンポーネント
 
