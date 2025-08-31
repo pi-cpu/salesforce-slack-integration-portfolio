@@ -38,10 +38,10 @@ Salesforce の **商談（Opportunity）** 更新をトリガーに、**Slack �
 
 **```mermaid**
 flowchart TD
-  T[OpportunityTrigger (after insert/update)]
-  H[SlackNotificationHandler]
-  Q[QueueJob (Database.AllowsCallouts)]
-  W[[Slack Incoming Webhook]]
+  T["OpportunityTrigger (after insert/update)"]
+  H["SlackNotificationHandler"]
+  Q["QueueJob (Database.AllowsCallouts)"]
+  W[["Slack Incoming Webhook"]]
 
   T --> H
   H -->|bulk filter & chunk| Q
