@@ -145,6 +145,43 @@ sf apex run test --tests SlackNotificationHandlerTest --result-format human
 - **変更管理**：閾値・ステージ変更は CMDT で即時反映（デプロイ不要）
 
 ---
+---
+
+## 複数レコード処理（バルク対応）
+
+本実装は **1トランザクションにつき1回だけ enqueue** し、Queueable Apex 内で **複数レコードをまとめて Slack に通知** する方式を採用しています。  
+
+### 設計ポイント
+
+- **Trigger 側**  
+  - 商談のフェーズ／金額が変化したものだけを抽出  
+  - 変更 ID を `Set<Id>` で一括管理し、重複排除  
+  - `System.enqueueJob(new SlackNotificationHandler(ids))` を **1回のみ呼び出し**
+
+- **Queueable 側**  
+  - 渡された ID を SOQL でまとめて取得  
+  - CMDT の条件（Enabled, MinAmount, TargetStages）でフィルタ  
+  - Slack Block Kit の **50 blocks 制限**に対応するため、**チャンク分割（最大15件/メッセージ）**して複数 POST
+
+### コード抜粋（チャンク処理部）
+
+```apex
+Integer baseBlocks = 2;   // 先頭 section + divider
+Integer perRecord  = 3;   // 1件あたり section + actions + divider
+Integer maxBlocks  = 50;
+Integer maxPerMessage = (maxBlocks - baseBlocks) / perRecord; // 16件まで
+Integer CHUNK = Math.min(15, maxPerMessage); // 安全に15件まで
+
+for (Integer i=0; i<filtered.size(); i+=CHUNK) {
+    List<Opportunity> chunk = filtered.subList(i, Math.min(i+CHUNK, filtered.size()));
+    List<Object> blocks = new List<Object>();
+    blocks.add(sectionText('*商談更新* :bell:（まとめ通知 ' + (i/CHUNK+1) + '/' +
+                   (Integer)Math.ceil((Decimal)filtered.size()/CHUNK) + '）'));
+    blocks.add(divider());
+    // ... 各商談を section/actions で追加 ...
+    doPost(JSON.serialize(new Map<String,Object>{ 'blocks' => blocks }));
+}
+
 
 ## トラブルシュート
 
