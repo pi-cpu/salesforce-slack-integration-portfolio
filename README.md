@@ -46,9 +46,10 @@ flowchart TD
   T --> H
   H -->|bulk filter & chunk| Q
   Q -->|POST JSON (blocks)| W
-
+```
 
 ### 主要コンポーネント
+
 - **OpportunityTrigger.trigger**  
   フェーズ／金額変化を検知して通知対象を抽出。関連情報をバルク SOQL で取得し、1トランザクションにつき1ジョブだけ enqueue。
 - **SlackNotificationHandler.cls**  
@@ -61,15 +62,18 @@ flowchart TD
 ## セットアップ
 
 ### 0) 前提
+
 - Salesforce 組織（Sandbox / Dev Org）
 - Slack ワークスペース（アプリ「Incoming Webhooks」を有効化）
 - Salesforce CLI（新 CLI）：`sf` コマンドが使えること
 
 ### 1) Slack Webhook URL を発行
+
 1. Slack で **Incoming Webhooks** を有効化  
 2. 通知先チャンネルを選択して **Webhook URL** を取得
 
 ### 2) Salesforce 側の準備
+
 1. **Named Credential** を作成  
    - 設定 → **名前付き資格情報** → 新規  
    - ラベル: `Slack Webhook` / 名前: `Slack_Webhook`  
@@ -86,6 +90,7 @@ flowchart TD
    - レコード `Default` を作成して上記項目を設定
 
 ### 3) デプロイ & テスト
+
 ```bash
 # 接続
 sf org login web --alias MyOrg
@@ -106,6 +111,7 @@ sf apex run test --tests SlackNotificationHandlerTest --result-format human
 - 送信されるメッセージは **Block Kit** 構造で、読みやすいカード風のレイアウトになります。
 
 ### 送信 JSON（例）
+
 ```json
 {
   "blocks": [
