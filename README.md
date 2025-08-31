@@ -37,12 +37,16 @@ Salesforce の **商談（Opportunity）** 更新をトリガーに、**Slack �
 ## アーキテクチャ
 
 ```mermaid
-flowchart LR
-    A[Opportunity Update] --> B[Apex Trigger]
-    B --> C[SlackNotificationHandler<br/>(Queueable + AllowsCallouts)]
-    C --> D[Named Credential: Slack_Webhook]
-    D --> E[Slack Incoming Webhook]
-    E --> F[Slack Channel]
+flowchart TD
+  T[OpportunityTrigger (after insert/update)]
+  H[SlackNotificationHandler]
+  Q[QueueJob (Database.AllowsCallouts)]
+  W[[Slack Incoming Webhook]]
+
+  T --> H
+  H -->|bulk filter & chunk| Q
+  Q -->|POST JSON (blocks)| W
+
 ```
 
 ### 主要コンポーネント
