@@ -47,7 +47,6 @@ flowchart TD
   H -->|bulk filter & chunk| Q
   Q -->|POST JSON (blocks)| W
 
-```
 
 ### 主要コンポーネント
 - **OpportunityTrigger.trigger**  
