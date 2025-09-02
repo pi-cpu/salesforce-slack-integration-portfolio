@@ -2,16 +2,17 @@
 private class SlackNotificationHandlerTest {
 
     // --- CMDTレコードを用意（テスト内のDMLは可） ---
-    private static void upsertCmdt(Boolean enabled, Decimal minAmount, String stagesCsv) {
-        // 既定想定: DeveloperName='Default'
-        Slack_Config__mdt m = new Slack_Config__mdt(
-            DeveloperName = 'Default',
-            MasterLabel   = 'Default',
-            Enabled__c    = enabled,
-            MinAmount__c  = minAmount,
-            TargetStages__c = stagesCsv
-        );
-        upsert m DeveloperName; // DeveloperNameを外部キー代わりに
+    private static void setConf(Boolean enabled, Decimal minAmount, String stagesCsv) {
+        SlackConfigProvider.Conf c = new SlackConfigProvider.Conf();
+        c.enabled = enabled;
+        c.minAmount = minAmount;
+        c.targetStages.clear();
+        if (!String.isBlank(stagesCsv)) {
+            for (String s : stagesCsv.split('\\s*,\\s*')) {
+                if (!String.isBlank(s)) c.targetStages.add(s.trim());
+            }
+        }
+        SlackConfigProvider.setTestConf(c);
     }
 
     // --- 最小限の商談作成 ---
@@ -26,7 +27,7 @@ private class SlackNotificationHandlerTest {
 
     // ========== テスト1：Insertで複数件、フィルタにより通知対象が絞られる ==========
     @IsTest static void testBulkInsertWithFilterAndSuccessPost() {
-        upsertCmdt(true, 50000, 'Prospecting, Proposal/Price Quote');
+        setConf(true, 50000, 'Prospecting, Proposal/Price Quote');
 
         List<Opportunity> opps = new List<Opportunity>{
             newOpp('A-対象(Prospecting 10万)', 'Prospecting', 100000),
@@ -53,7 +54,7 @@ private class SlackNotificationHandlerTest {
 
     // ========== テスト2：Updateでステージ/金額の変更のみ通知、HTTP失敗でも落ちない ==========
     @IsTest static void testBulkUpdateChangeDetectionAndFailurePost() {
-        upsertCmdt(true, 0, 'Prospecting, Negotiation/Review');
+        setConf(true, 0, 'Prospecting, Negotiation/Review');
 
         // 事前Insert
         List<Opportunity> opps = new List<Opportunity>{
@@ -85,7 +86,7 @@ private class SlackNotificationHandlerTest {
 
     // ========== テスト3：機能OFFなら何も送らない ==========
     @IsTest static void testDisabledNoPost() {
-        upsertCmdt(false, 0, null);
+        setConf(false, 0, null);
         Test.startTest();
         SlackHttpMock.reset(200, 'OK');
         Test.setMock(HttpCalloutMock.class, new SlackHttpMock());
@@ -99,8 +100,12 @@ private class SlackNotificationHandlerTest {
         Opportunity o = newOpp('I-URL', 'Prospecting', 10000);
         insert o;
         String url = SlackNotificationHandler.makeRecordUrl('Opportunity', o.Id);
-        System.assert(url.startsWith(URL.getSalesforceBaseUrl().toExternalForm()), 'ベースURLから始まる');
+        System.assert(url.startsWith(System.Url.getOrgDomainUrl().toExternalForm()), 'ベースURLから始まる');
         System.assert(url.contains('/lightning/r/Opportunity/' + String.valueOf(o.Id) + '/view'),
             'LightningのレコードURL形式であること');
+    }
+    // ========== テスト終了後にCMDTのテスト用設定をクリア ==========
+    @IsTest static void testClearConf() {
+        SlackConfigProvider.clearTestConf();
     }
 }

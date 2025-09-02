@@ -1,5 +1,5 @@
 @IsTest
-private class SlackHttpMock implements HttpCalloutMock {
+public class SlackHttpMock implements HttpCalloutMock {
     public static Integer requestCount = 0;
     public static List<String> bodies = new List<String>();
     public static Integer statusCodeToReturn = 200;

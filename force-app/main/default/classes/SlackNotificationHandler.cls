@@ -86,7 +86,7 @@ public with sharing class SlackNotificationHandler {
     // Lightningレコード画面URLを動的生成
     @TestVisible private static String makeRecordUrl(String sobjectApiName, Id recordId) {
         // 例: https://xxx.lightning.force.com/lightning/r/Opportunity/006XXXXXXXXXXXX/view
-        String base = URL.getSalesforceBaseUrl().toExternalForm();
+        String base = System.Url.getOrgDomainUrl().toExternalForm();
         return base + '/lightning/r/' + sobjectApiName + '/' + recordId + '/view';
     }
 

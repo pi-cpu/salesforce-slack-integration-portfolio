@@ -6,12 +6,18 @@ public with sharing class SlackConfigProvider {
         public Set<String> targetStages = new Set<String>(); // 空でステージ判定なし
     }
 
+        // ===== Test Override =====    
+        @TestVisible private static Conf testConf; 
+        @TestVisible public static void setTestConf(Conf c) { testConf = c; }
+        @TestVisible public static void clearTestConf()     { testConf = null; }
+
     /**
      * CMDT: Slack_Config__mdt
      * - DeveloperName='Default' を1件用意（推奨）
      * - 将来的に複数レコード運用する場合は、ここで統合ロジックを追加（例：OR結合）
      */
     public static Conf load() {
+        if (testConf != null) return testConf; // ★ テスト時はここで即返す
         Conf c = new Conf();
 
         try {
