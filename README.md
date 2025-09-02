@@ -75,7 +75,7 @@ flowchart TD
 ### 2) Salesforce 側の準備
 
 1. **Named Credential** を作成  
-   - 設定 → **名前付き資格情報** → 新規  
+   - 設定 → **指定ログイン情報** → 新規  
    - ラベル: `Slack Webhook` / 名前: `Slack_Webhook`  
    - URL: 取得した Webhook URL  
    - 認証: なし（匿名 POST）  
