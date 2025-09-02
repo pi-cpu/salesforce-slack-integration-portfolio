@@ -54,7 +54,8 @@ private class SlackNotificationHandlerTest {
 
     // ========== テスト2：Updateでステージ/金額の変更のみ通知、HTTP失敗でも落ちない ==========
     @IsTest static void testBulkUpdateChangeDetectionAndFailurePost() {
-        setConf(true, 0, 'Prospecting, Negotiation/Review');
+        // ① Insert時は通知OFF（Queueableをenqueueさせない）
+        setConf(false, 0, 'Prospecting, Negotiation/Review');
 
         // 事前Insert
         List<Opportunity> opps = new List<Opportunity>{
@@ -68,6 +69,9 @@ private class SlackNotificationHandlerTest {
         opps[0].Description = 'テキストだけ変更（通知対象外）';
         opps[1].StageName = 'Negotiation/Review';
         opps[2].Amount = 90000;
+
+        // ② Update時は通知ON
+        setConf(true, 0, 'Prospecting, Negotiation/Review');
 
         Test.startTest();
         SlackHttpMock.reset(429, 'Too Many Requests'); // 失敗コードで返す
