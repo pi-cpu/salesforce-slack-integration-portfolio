@@ -11,7 +11,7 @@
 
 ## 概要
 
-Salesforce の **商談（Opportunity）** 更新をトリガーに、**Slack の指定チャンネルへ通知**します。  
+Salesforce の **商談（Opportunity）** 作成・更新（フェーズまたは金額の変更）をトリガーに、**Slack の指定チャンネルへ通知**します。  
 標準連携では難しい「通知条件・メッセージの細かい制御」を **Apex + Webhook** で柔軟に実現します。
 
 - 非同期処理（Queueable/AllowsCallouts）で **バルク安全**・ガバナ制限に配慮
@@ -51,11 +51,23 @@ flowchart TD
 ### 主要コンポーネント
 
 - **OpportunityTrigger.trigger**  
-  フェーズ／金額変化を検知して通知対象を抽出。関連情報をバルク SOQL で取得し、1トランザクションにつき1ジョブだけ enqueue。
+  - after insert/update で発火し、ロジックはハンドラーに委譲。
+  - Trigger自体は薄く保ち、保守性を確保。
 - **SlackNotificationHandler.cls**  
-  `Queueable, Database.AllowsCallouts` で非同期 POST。Slack Block Kit の `blocks` を組み立て、複数商談を1リクエストで送信。
+  - `Queueable, Database.AllowsCallouts` で非同期 POST。Slack Block Kit の `blocks` を組み立て、複数商談を1リクエストで送信。
+  - フィルタ条件：
+    - 新規作成時は必ず通知。
+    - 更新時はフェーズ/金額が変化した場合のみ通知。
+    - CMDTの金額しきい値・対象ステージを適用。
+  - Slack Block Kit を組み立て：1レコード = 3ブロック（divider / section / actions）。
+  - Slack制約（50ブロック/メッセージ）に対応 → 最大15件/メッセージ。
+  - Queueable + AllowsCallouts で非同期POST。
 - **SlackConfigProvider.cls**  
-  CMDT `Slack_Config__mdt` を読み込み、`Enabled__c` / `MinAmount__c` / `TargetStages__c` を提供。未設定時も安全デフォルトで動作。
+  - CMDT `Slack_Config__mdt` を読み込み、`Enabled__c` / `MinAmount__c` / `TargetStages__c` を提供。
+  - 未設定時も安全デフォルトで動作。
+- **SlackHttpMock.cls**
+  - HttpCalloutMock 実装。リクエスト回数・本文を蓄積し、レスポンスコードを動的に切り替え可能。
+  - 単体テストで「成功／失敗」両方を再現できる。
 
 ---
 
