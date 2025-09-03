@@ -10,7 +10,7 @@
 
 ## 概要
 
-Salesforce の商談（Opportunity）作成・更新（フェーズまたは金額の変更）をトリガーに、Slack の指定チャンネルへ通知するポートフォリオです。標準連携では難しい「通知条件・メッセージの細かい制御」を **Apex + Webhook** で柔軟に実現しています【216642647232840†L289-L296】。
+Salesforce の商談（Opportunity）作成・更新（フェーズまたは金額の変更）をトリガーに、Slack の指定チャンネルへ通知するポートフォリオです。標準連携では難しい「通知条件・メッセージの細かい制御」を **Apex + Webhook** で柔軟に実現しています。
 
 - **非同期処理（Queueable / AllowsCallouts）でバルク安全・ガバナ制限に配慮**
 - **閾値や対象ステージは Custom Metadata Type (CMDT) でノーコード管理**
@@ -22,7 +22,7 @@ Salesforce の商談（Opportunity）作成・更新（フェーズまたは金�
 
 > スクリーンショット差し替え想定：`docs/screenshot‑slack.png` を後日追加予定。
 
-```mermaid
+```txt
 [商談更新] ACME – 新規導入案件
 フェーズ: Negotiation/Review (確度 50%)
 金額: ¥3,000,000
