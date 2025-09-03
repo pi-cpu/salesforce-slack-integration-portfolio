@@ -50,19 +50,19 @@ flowchart TD
 
 - **OpportunityTrigger.trigger**
   - after insert/update で発火し、ロジックはハンドラーに委譲。
-  - トリガ自体は薄く保ち、保守性を確保します【216642647232840†L326-L329】。
+  - トリガ自体は薄く保ち、保守性を確保します。
 - **SlackNotificationHandler.cls**
-  - `Queueable, Database.AllowsCallouts` で非同期 POST。Slack Block Kit の `blocks` を組み立て、複数商談を1リクエストで送信します【216642647232840†L330-L337】。
+  - `Queueable, Database.AllowsCallouts` で非同期 POST。Slack Block Kit の `blocks` を組み立て、複数商談を1リクエストで送信します。
   - フィルタ条件：
     - 新規作成時は必ず通知。
     - 更新時はフェーズ/金額が変化した場合のみ通知。
-    - CMDT の金額しきい値・対象ステージを適用します【216642647232840†L333-L336】。
-  - Slack 制約（50 ブロック/メッセージ）に対応するため、最大15件/メッセージになるようチャンク分割して送信します【216642647232840†L337-L339】。
+    - CMDT の金額しきい値・対象ステージを適用します。
+  - Slack 制約（50 ブロック/メッセージ）に対応するため、最大15件/メッセージになるようチャンク分割して送信します。
 - **SlackConfigProvider.cls**
-  - CMDT `Slack_Config__mdt` から `Enabled__c` / `MinAmount__c` / `TargetStages__c` を読み込み提供します【216642647232840†L340-L343】。
+  - CMDT `Slack_Config__mdt` から `Enabled__c` / `MinAmount__c` / `TargetStages__c` を読み込み提供します。
   - 未設定時でも安全なデフォルト動作を提供します。
 - **SlackHttpMock.cls**
-  - `HttpCalloutMock` を実装し、リクエスト回数や本文を蓄積。レスポンスコードを動的に切り替えられるため、単体テストで成功／失敗の両方を再現できます【216642647232840†L344-L345】。
+  - `HttpCalloutMock` を実装し、リクエスト回数や本文を蓄積。レスポンスコードを動的に切り替えられるため、単体テストで成功／失敗の両方を再現できます。
 
 ---
 
@@ -72,22 +72,22 @@ flowchart TD
 
 - Salesforce 組織（Sandbox / Dev Org）
 - Slack ワークスペース（アプリ「Incoming Webhooks」を有効化）
-- Salesforce CLI（新 CLI）：`sf` コマンドが使えること【216642647232840†L353-L355】
+- Salesforce CLI（新 CLI）：`sf` コマンドが使えること
 
 ### 1) Slack Webhook URL を発行
 
-1. Slack で Incoming Webhooks を有効化します【216642647232840†L358-L360】。
-2. 通知先チャンネルを選択して Webhook URL を取得します【216642647232840†L358-L361】。
+1. Slack で Incoming Webhooks を有効化します。
+2. 通知先チャンネルを選択して Webhook URL を取得します。
 
 ### 2) Salesforce 側の準備
 
-1. **Named Credential** を作成します【216642647232840†L364-L369】。
+1. **Named Credential** を作成します。
    - 設定 → 指定ログイン情報 → 新規
    - ラベル: `Slack Webhook` / 名前: `Slack_Webhook`
    - URL: 取得した Webhook URL
    - 認証: なし（匿名 POST）
    - 利用ユーザへ権限セット割り当てを忘れない
-2. **Custom Metadata Type (CMDT)** を作成します【216642647232840†L370-L378】。
+2. **Custom Metadata Type (CMDT)** を作成します。
    - 設定 → カスタムメタデータ型 → 新規
    - ラベル: `Slack Config` / API 名: `Slack_Config`
    - 項目:
@@ -104,18 +104,18 @@ sf org login web --alias MyOrg
 sf config set target-org=MyOrg
 
 # デプロイ
-sf project deploy start --source-dir force-app --ignore-conflicts【216642647232840†L382-L388】
+sf project deploy start --source-dir force-app --ignore-conflicts
 
 # 単体テスト（必要に応じてクラス名を調整）
-sf apex run test --tests SlackNotificationHandlerTest --result-format human【216642647232840†L389-L390】
+sf apex run test --tests SlackNotificationHandlerTest --result-format human
 ```
 
 ---
 
 ## 使い方
 
-- 商談の **フェーズ** または **金額** が変化したときにトリガが抽出し、ハンドラが Slack へ送信します【216642647232840†L394-L397】。
-- メッセージは Block Kit 構造で、読みやすいカード風のレイアウトになります【216642647232840†L397-L398】。
+- 商談の **フェーズ** または **金額** が変化したときにトリガが抽出し、ハンドラが Slack へ送信します。
+- メッセージは Block Kit 構造で、読みやすいカード風のレイアウトになります。
 
 ### 送信 JSON（例）
 
@@ -139,43 +139,43 @@ sf apex run test --tests SlackNotificationHandlerTest --result-format human【21
 
 ## カスタマイズ
 
-- **通知しきい値** – `MinAmount__c` に金額下限をセット（未設定なら無効）【216642647232840†L420-L421】。
-- **対象ステージ** – `TargetStages__c` にカンマ区切りで列挙（空なら無効）【216642647232840†L421-L422】。
-- **ON/OFF** – `Enabled__c` で一時停止が可能【216642647232840†L422-L423】。
-- **拡張** – Teams/Discord/Google Chat などの Webhook にも容易に派生できます【216642647232840†L423-L424】。
+- **通知しきい値** – `MinAmount__c` に金額下限をセット（未設定なら無効）。
+- **対象ステージ** – `TargetStages__c` にカンマ区切りで列挙（空なら無効）。
+- **ON/OFF** – `Enabled__c` で一時停止が可能。
+- **拡張** – Teams/Discord/Google Chat などの Webhook にも容易に派生できます。
 
 ---
 
 ## セキュリティ
 
-- Webhook URL は Named Credential に格納し、コードやリポジトリに含めません【216642647232840†L429-L430】。
-- GitHub では Push Protection / Secret Scanning を有効にします【216642647232840†L429-L431】。
-- テストやログでシークレットを出力しないようにし、`System.debug` の取り扱いに注意します【216642647232840†L431-L432】。
+- Webhook URL は Named Credential に格納し、コードやリポジトリに含めません。
+- GitHub では Push Protection / Secret Scanning を有効にします。
+- テストやログでシークレットを出力しないようにし、`System.debug` の取り扱いに注意します。
 
 ---
 
 ## 運用ガイド
 
-- **ログ監視**：失敗時は `System.debug(ERROR, ...)` が出力されます（本番は監査用カスタムオブジェクトや Platform Event へ移行可）【216642647232840†L437-L438】。
-- **負荷対策**：1 トランザクション=1 ジョブ運用。大量更新は Platform Events 等へ拡張余地があります【216642647232840†L438-L439】。
-- **変更管理**：閾値・ステージ変更は CMDT で即時反映可能（デプロイ不要）【216642647232840†L439-L440】。
+- **ログ監視**：失敗時は `System.debug(ERROR, ...)` が出力されます（本番は監査用カスタムオブジェクトや Platform Event へ移行可）。
+- **負荷対策**：1 トランザクション=1 ジョブ運用。大量更新は Platform Events 等へ拡張余地があります。
+- **変更管理**：閾値・ステージ変更は CMDT で即時反映可能（デプロイ不要）。
 
 ---
 
 ## 複数レコード処理（バルク対応）
 
-本実装は 1 トランザクションにつき1回だけ `enqueueJob` し、Queueable Apex 内で複数レコードをまとめて Slack に通知する方式を採用しています【216642647232840†L446-L449】。
+本実装は 1 トランザクションにつき1回だけ `enqueueJob` し、Queueable Apex 内で複数レコードをまとめて Slack に通知する方式を採用しています。
 
 ### 設計ポイント
 
 - **Trigger 側**
-  - 商談のフェーズ／金額が変化したものだけを抽出【216642647232840†L454-L456】。
-  - 変更 ID を `Set<Id>` で一括管理し、重複を排除します【216642647232840†L454-L456】。
-  - `System.enqueueJob(new SlackNotificationHandler(ids))` を1回だけ呼び出します【216642647232840†L456-L457】。
+  - 商談のフェーズ／金額が変化したものだけを抽出。
+  - 変更 ID を `Set<Id>` で一括管理し、重複を排除します。
+  - `System.enqueueJob(new SlackNotificationHandler(ids))` を1回だけ呼び出します。
 - **Queueable 側**
-  - 渡された ID を SOQL でまとめて取得します【216642647232840†L458-L459】。
-  - CMDT の条件（Enabled, MinAmount, TargetStages）でフィルタします【216642647232840†L459-L461】。
-  - Slack Block Kit の 50 blocks 制限に対応するため、チャンク分割（最大15件/メッセージ）して複数 POST します【216642647232840†L461-L463】。
+  - 渡された ID を SOQL でまとめて取得します。
+  - CMDT の条件（Enabled, MinAmount, TargetStages）でフィルタします。
+  - Slack Block Kit の 50 blocks 制限に対応するため、チャンク分割（最大15件/メッセージ）して複数 POST します。
 
 コード抜粋（チャンク処理部）:
 
@@ -201,10 +201,10 @@ for (Integer i = 0; i < filtered.size(); i += CHUNK) {
 
 ## トラブルシュート
 
-- **ApexClass XML エラー（`cvc-elt.1.a`）** — メタ XML が SFDX 形式になっているか確認します（`<ApexClass xmlns=...>` / `<ApexTrigger xmlns=...>`）【216642647232840†L484-L487】。
-- **`Invalid type: SlackConfigProvider.Conf`** — 依存順を確認し、`SlackConfigProvider` のデプロイが先行しているかチェックします【216642647232840†L488-L489】。
-- **Slack が 401/403** — Webhook URL が無効または権限不足です。Named Credential を再確認します【216642647232840†L490-L491】。
-- **Git の push で non-fast-forward** — 初期 README がリモートにあるだけなら `git push --force-with-lease` で上書きします【216642647232840†L492-L493】。
+- **ApexClass XML エラー（`cvc-elt.1.a`）** — メタ XML が SFDX 形式になっているか確認します（`<ApexClass xmlns=...>` / `<ApexTrigger xmlns=...>`）。
+- **`Invalid type: SlackConfigProvider.Conf`** — 依存順を確認し、`SlackConfigProvider` のデプロイが先行しているかチェックします。
+- **Slack が 401/403** — Webhook URL が無効または権限不足です。Named Credential を再確認します。
+- **Git の push で non-fast-forward** — 初期 README がリモートにあるだけなら `git push --force-with-lease` で上書きします。
 
 ---
 
@@ -236,19 +236,19 @@ Salesforce や Slack の標準機能に加え、個人のポートフォリオ�
 
 本プロジェクトでは、保守性・拡張性・テスト容易性を高めるために以下のような設計上の工夫を取り入れています。
 
-- **薄いトリガとハンドラパターン** – Opportunity の after insert/update トリガではロジックをハンドラーへ委譲し、トリガ自体を薄く保って保守性を向上させています【216642647232840†L326-L329】。
-- **非同期キュー処理** – `Queueable` と `Database.AllowsCallouts` を併用することで、複数商談をまとめて非同期に通知し、ガバナ制限やバルク処理に配慮しています【216642647232840†L330-L339】。
-- **Block Kit 制限を考慮したチャンク分割** – Slack は 1 メッセージあたり 50 ブロックまでという制約があるため、チャンク分割して最大 15 件/メッセージにまとめるアルゴリズムを組み込んでいます【216642647232840†L337-L339】【216642647232840†L461-L463】。
-- **設定値のメタデータ化** – 通知の有効/無効、金額しきい値、対象ステージなどの条件は Custom Metadata Type から取得するため、ノーコードで即時変更が可能です【216642647232840†L333-L337】【216642647232840†L340-L343】。
-- **シークレットの外部化** – Slack Webhook URL は Named Credential に保存し、リポジトリに平文で含めないことでセキュリティを高めています【216642647232840†L429-L430】。
-- **テスト容易性** – `HttpCalloutMock` を実装し、実際の Slack へ送信することなくリクエスト内容やレスポンスを検証できるように設計しています【216642647232840†L344-L345】。
-- **バルク対応の一括 enqueue** – 1 トランザクションにつき 1 回だけキューを登録し、その中で複数レコードを処理することで、無駄なジョブの生成や重複通知を防いでいます【216642647232840†L446-L449】。
+- **薄いトリガとハンドラパターン** – Opportunity の after insert/update トリガではロジックをハンドラーへ委譲し、トリガ自体を薄く保って保守性を向上させています。
+- **非同期キュー処理** – `Queueable` と `Database.AllowsCallouts` を併用することで、複数商談をまとめて非同期に通知し、ガバナ制限やバルク処理に配慮しています。
+- **Block Kit 制限を考慮したチャンク分割** – Slack は 1 メッセージあたり 50 ブロックまでという制約があるため、チャンク分割して最大 15 件/メッセージにまとめるアルゴリズムを組み込んでいます。
+- **設定値のメタデータ化** – 通知の有効/無効、金額しきい値、対象ステージなどの条件は Custom Metadata Type から取得するため、ノーコードで即時変更が可能です。
+- **シークレットの外部化** – Slack Webhook URL は Named Credential に保存し、リポジトリに平文で含めないことでセキュリティを高めています。
+- **テスト容易性** – `HttpCalloutMock` を実装し、実際の Slack へ送信することなくリクエスト内容やレスポンスを検証できるように設計しています。
+- **バルク対応の一括 enqueue** – 1 トランザクションにつき 1 回だけキューを登録し、その中で複数レコードを処理することで、無駄なジョブの生成や重複通知を防いでいます。
 
 ---
 
 ## ライセンス
 
-このポートフォリオは学習・採用選考の評価目的で公開しています。商用利用や再配布はご相談ください【216642647232840†L495-L500】。
+このポートフォリオは学習・採用選考の評価目的で公開しています。商用利用や再配布はご相談ください。
 
 ---
 
