@@ -26,8 +26,6 @@ Salesforce の商談（Opportunity）作成・更新（フェーズまたは金�
 [商談更新] ACME – 新規導入案件
 フェーズ: Negotiation/Review (確度 50%)
 金額: ¥3,000,000
-担当: Taro Sales
-備考: 9/15 見積再提示
 ```
 
 ---
